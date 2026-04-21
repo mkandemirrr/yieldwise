@@ -17,7 +17,7 @@ export async function POST(request: Request) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-haiku-4-5-20251001",
         max_tokens: 1500,
         system: "You are a professional portfolio analyst. Analyze the given portfolio and provide: 1) Overall health score (0-100), 2) Sector diversification analysis, 3) Risk assessment, 4) Top 3 recommendations for improvement. Be concise and use bullet points. Add disclaimer about not being financial advice.",
         messages: [{ role: "user", content: `Analyze this portfolio:\n${JSON.stringify(portfolio, null, 2)}` }],
