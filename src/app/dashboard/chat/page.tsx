@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { MessageSquare, Send, Zap, User, Bot, Sparkles } from "lucide-react";
+import { Send, Bot, User, Sparkles, TrendingUp, BarChart3, DollarSign, Shield, RotateCcw } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -9,17 +9,46 @@ interface Message {
 }
 
 const SUGGESTIONS = [
-  "Is my portfolio too risky?",
-  "Which stocks pay the best dividends?",
-  "Should I buy NVDA at this price?",
-  "Analyze Apple's latest earnings",
-  "How can I diversify my portfolio?",
-  "What's the outlook for tech stocks?",
+  { text: "Analyze Apple stock", icon: <TrendingUp size={14} /> },
+  { text: "Best dividend stocks to buy", icon: <DollarSign size={14} /> },
+  { text: "Is my portfolio too risky?", icon: <Shield size={14} /> },
+  { text: "Compare NVDA vs AMD", icon: <BarChart3 size={14} /> },
+  { text: "What ETFs should I invest in?", icon: <TrendingUp size={14} /> },
+  { text: "Tech sector outlook 2026", icon: <BarChart3 size={14} /> },
 ];
+
+// Simple markdown-like rendering
+function renderContent(content: string) {
+  const lines = content.split("\n");
+  return lines.map((line, i) => {
+    // Bold
+    let rendered = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Bullet points
+    if (rendered.startsWith("- ") || rendered.startsWith("• ")) {
+      rendered = `<span style="color:var(--accent);margin-right:6px">•</span>${rendered.slice(2)}`;
+      return <div key={i} style={{ paddingLeft: 8, marginBottom: 2 }} dangerouslySetInnerHTML={{ __html: rendered }} />;
+    }
+    // Headers
+    if (rendered.startsWith("## ")) {
+      return <div key={i} style={{ fontWeight: 700, fontSize: 15, marginTop: 12, marginBottom: 4, color: "var(--text-primary)" }} dangerouslySetInnerHTML={{ __html: rendered.slice(3) }} />;
+    }
+    if (rendered.startsWith("# ")) {
+      return <div key={i} style={{ fontWeight: 800, fontSize: 16, marginTop: 12, marginBottom: 6, color: "var(--text-primary)" }} dangerouslySetInnerHTML={{ __html: rendered.slice(2) }} />;
+    }
+    // Empty line
+    if (rendered.trim() === "") return <div key={i} style={{ height: 8 }} />;
+    // Regular line
+    return <div key={i} dangerouslySetInnerHTML={{ __html: rendered }} />;
+  });
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hello! I'm your AI financial assistant. I can help you analyze stocks, evaluate your portfolio, track dividends, and understand market trends.\n\nTry asking me something like:\n• \"Is Apple a good buy right now?\"\n• \"How diversified is my portfolio?\"\n• \"What are the best dividend stocks?\"\n\nHow can I help you today?", timestamp: new Date() },
+    {
+      role: "assistant",
+      content: "👋 **Welcome to YieldWise AI!**\n\nI'm your personal financial assistant powered by real-time market data + AI.\n\n**What I can do:**\n- 📈 Analyze any stock with live prices\n- 💰 Find the best dividend opportunities\n- 🎯 Evaluate your portfolio risk\n- 📊 Compare stocks side-by-side\n- 🌎 Provide market outlook and trends\n\nTry one of the suggestions below or ask me anything!",
+      timestamp: new Date(),
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,8 +60,8 @@ export default function ChatPage() {
 
   const sendMessage = async (text?: string) => {
     const msg = text || input;
-    if (!msg.trim()) return;
-    
+    if (!msg.trim() || loading) return;
+
     const userMsg: Message = { role: "user", content: msg, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
@@ -42,58 +71,58 @@ export default function ChatPage() {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, history: messages.slice(-6) }),
+        body: JSON.stringify({ message: msg, history: messages.slice(-8) }),
       });
       const data = await res.json();
-      setMessages(prev => [...prev, { role: "assistant", content: data.response || "I can provide detailed analysis with a Pro subscription. For now, here are some general insights based on your question.", timestamp: new Date() }]);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: data.response || "I couldn't process that. Please try again.",
+        timestamp: new Date(),
+      }]);
     } catch {
-      // Fallback response when API is not configured
-      const fallback = generateFallbackResponse(msg);
-      setMessages(prev => [...prev, { role: "assistant", content: fallback, timestamp: new Date() }]);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "⚠️ Connection error. Please check your internet and try again.",
+        timestamp: new Date(),
+      }]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const generateFallbackResponse = (question: string): string => {
-    const q = question.toLowerCase();
-    if (q.includes("risk") || q.includes("risky")) {
-      return "📊 **Portfolio Risk Assessment**\n\nBased on typical portfolio analysis:\n• **Beta**: A diversified portfolio should target a beta around 1.0\n• **Sector Concentration**: Aim for no single sector above 30%\n• **Individual Stock**: No single stock should exceed 10-15% of your portfolio\n\nConnect your portfolio for a personalized AI risk analysis!";
-    }
-    if (q.includes("dividend")) {
-      return "💰 **Top Dividend Insights**\n\nHigh-quality dividend stocks to consider:\n• **JNJ** — 3.12% yield, 62 years of increases\n• **KO** — 2.88% yield, Dividend King\n• **PG** — 2.38% yield, 68 years of increases\n• **XOM** — 3.25% yield, strong cash flow\n\nLook for companies with:\n✅ Payout ratio under 60%\n✅ 10+ years of dividend growth\n✅ Strong free cash flow";
-    }
-    if (q.includes("apple") || q.includes("aapl")) {
-      return "🍎 **Apple (AAPL) Analysis**\n\n• **Price**: $218.45 (+0.93%)\n• **P/E Ratio**: 28.5x (slightly above sector avg)\n• **Market Cap**: $3.35T\n• **Dividend Yield**: 0.46%\n\n**AI Assessment**: Strong fundamentals with growing services revenue. iPhone 16 cycle performing well. AI integration (Apple Intelligence) is a growth catalyst.\n\n**AI Score: 82/100** — Hold/Accumulate";
-    }
-    return "🤖 **AI Analysis**\n\nGreat question! To provide the most accurate analysis, I use real-time market data and advanced AI models.\n\n**Key principles for smart investing:**\n1. Diversify across sectors and geographies\n2. Focus on quality companies with strong fundamentals\n3. Keep a long-term perspective\n4. Reinvest dividends for compound growth\n5. Regularly rebalance your portfolio\n\nAsk me about specific stocks, sectors, or strategies!";
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       {/* Header */}
       <div style={{
-        padding: "20px 32px", borderBottom: "1px solid var(--border)",
-        display: "flex", alignItems: "center", gap: 12,
+        padding: "16px 32px", borderBottom: "1px solid var(--border)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
       }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: 12,
-          background: "var(--gradient-green)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <Sparkles size={20} color="white" />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12,
+            background: "var(--gradient-green)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Sparkles size={20} color="white" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              AI Financial Chat
+              <span className="badge badge-green" style={{ fontSize: 10 }}>LIVE DATA</span>
+            </h1>
+            <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Powered by Claude AI + Real-Time Market Data</p>
+          </div>
         </div>
-        <div>
-          <h1 style={{ fontSize: 18, fontWeight: 700 }}>AI Financial Chat</h1>
-          <p style={{ fontSize: 12, color: "var(--text-muted)" }}>Powered by Claude AI • Ask anything about investing</p>
-        </div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setMessages([messages[0]])} title="New Chat">
+          <RotateCcw size={16} /> New Chat
+        </button>
       </div>
 
       {/* Messages */}
       <div style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}>
         {messages.map((m, i) => (
           <div key={i} style={{
-            display: "flex", gap: 12, marginBottom: 24,
+            display: "flex", gap: 12, marginBottom: 20,
             flexDirection: m.role === "user" ? "row-reverse" : "row",
           }}>
             <div style={{
@@ -109,15 +138,14 @@ export default function ChatPage() {
               background: m.role === "user" ? "var(--blue-light)" : "var(--bg-card)",
               border: `1px solid ${m.role === "user" ? "rgba(59,130,246,0.2)" : "var(--border)"}`,
               fontSize: 14, lineHeight: 1.7, color: "var(--text-secondary)",
-              whiteSpace: "pre-wrap",
             }}>
-              {m.content}
+              {m.role === "assistant" ? renderContent(m.content) : m.content}
             </div>
           </div>
         ))}
 
         {loading && (
-          <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
               background: "var(--accent-light)",
@@ -129,15 +157,19 @@ export default function ChatPage() {
             <div style={{
               padding: "14px 18px", borderRadius: 14,
               background: "var(--bg-card)", border: "1px solid var(--border)",
-              display: "flex", gap: 6,
             }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{
-                  width: 8, height: 8, borderRadius: "50%",
-                  background: "var(--text-muted)",
-                  animation: `pulse-green 1.4s ease-in-out ${i * 0.2}s infinite`,
-                }} />
-              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-muted)" }}>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {[0, 1, 2].map(i => (
+                    <div key={i} style={{
+                      width: 7, height: 7, borderRadius: "50%",
+                      background: "var(--accent)",
+                      animation: `pulse-green 1.4s ease-in-out ${i * 0.2}s infinite`,
+                    }} />
+                  ))}
+                </div>
+                Analyzing with real-time data...
+              </div>
             </div>
           </div>
         )}
@@ -146,11 +178,11 @@ export default function ChatPage() {
 
       {/* Suggestions */}
       {messages.length <= 1 && (
-        <div style={{ padding: "0 32px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ padding: "0 32px 12px", display: "flex", gap: 8, flexWrap: "wrap" }}>
           {SUGGESTIONS.map(s => (
-            <button key={s} onClick={() => sendMessage(s)}
-              className="btn btn-secondary btn-sm" style={{ fontSize: 12 }}>
-              {s}
+            <button key={s.text} onClick={() => sendMessage(s.text)}
+              className="btn btn-secondary btn-sm" style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              {s.icon} {s.text}
             </button>
           ))}
         </div>
@@ -160,13 +192,16 @@ export default function ChatPage() {
       <div style={{ padding: "16px 32px", borderTop: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
         <form onSubmit={e => { e.preventDefault(); sendMessage(); }}
           style={{ display: "flex", gap: 12 }}>
-          <input className="input" placeholder="Ask about stocks, dividends, portfolio strategy..."
+          <input className="input" placeholder="Ask about any stock, portfolio strategy, dividends..."
             value={input} onChange={e => setInput(e.target.value)} disabled={loading}
             style={{ flex: 1, fontSize: 14 }} />
           <button type="submit" className="btn btn-primary" disabled={loading || !input.trim()}>
             <Send size={16} />
           </button>
         </form>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 8, textAlign: "center" }}>
+          YieldWise AI can make mistakes. Not financial advice. Always do your own research.
+        </p>
       </div>
     </div>
   );
