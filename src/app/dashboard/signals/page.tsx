@@ -1,109 +1,240 @@
 "use client";
-import { TrendingUp, TrendingDown, AlertCircle, Clock, ArrowUpRight, ArrowDownRight, Newspaper, BarChart3 } from "lucide-react";
+import { useState } from "react";
+import { TrendingUp, TrendingDown, Minus, Search, RefreshCw, Zap, BarChart3 } from "lucide-react";
 
-const SIGNALS = [
-  { type: "bullish", symbol: "NVDA", title: "Strong Momentum Signal", desc: "MACD bullish crossover with RSI at 62. Volume surge 45% above 20-day average. AI confidence: 84%.", time: "2 min ago", confidence: 84 },
-  { type: "bearish", symbol: "TSLA", title: "Bearish Divergence Detected", desc: "Price making higher highs but RSI making lower highs. Volume declining on up days. Watch support at $240.", time: "15 min ago", confidence: 71 },
-  { type: "bullish", symbol: "AAPL", title: "Earnings Beat Expected", desc: "Consensus estimates upgraded by 3 analysts this week. Services revenue growing at 14% YoY. Options flow bullish.", time: "1 hr ago", confidence: 76 },
-  { type: "neutral", symbol: "MSFT", title: "AI Cloud Growth Accelerating", desc: "Azure AI revenue up 60% YoY per latest report. Strong enterprise adoption. Price near resistance at $460.", time: "2 hr ago", confidence: 68 },
-  { type: "bullish", symbol: "JPM", title: "Financial Sector Upgrade", desc: "Fed rate cuts expected in Q3. Net interest margin expanding. Dividend payout healthy at 27%.", time: "3 hr ago", confidence: 72 },
-  { type: "bearish", symbol: "KO", title: "Consumer Spending Slowdown", desc: "Retail sales data weaker than expected. Consumer staples may face margin pressure. Watch for earnings guidance.", time: "4 hr ago", confidence: 58 },
-];
+interface Signal {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePct: number;
+  signal: "BUY" | "SELL" | "HOLD";
+  score: number;
+  reason: string;
+  indicators: { name: string; value: string; signal: "bullish" | "bearish" | "neutral" }[];
+}
 
-const NEWS = [
-  { title: "Fed Signals Possible Rate Cut in June Meeting", source: "Reuters", time: "30 min ago", sentiment: "bullish" },
-  { title: "NVIDIA Announces Next-Gen AI Chip Architecture", source: "Bloomberg", time: "1 hr ago", sentiment: "bullish" },
-  { title: "US-China Trade Tensions Escalate Over Tech Export Controls", source: "CNBC", time: "2 hr ago", sentiment: "bearish" },
-  { title: "Tesla Q1 Deliveries Beat Expectations by 8%", source: "MarketWatch", time: "3 hr ago", sentiment: "bullish" },
-  { title: "Oil Prices Drop 3% on OPEC Production Increase", source: "WSJ", time: "4 hr ago", sentiment: "bearish" },
-];
+const POPULAR = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN", "META", "TSLA", "JPM"];
 
 export default function SignalsPage() {
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [symbol, setSymbol] = useState("");
+
+  const analyzeStock = async (sym?: string) => {
+    const target = (sym || symbol).toUpperCase().trim();
+    if (!target) return;
+    setLoading(true);
+
+    try {
+      // Fetch quote + profile
+      const [quoteRes, profileRes] = await Promise.all([
+        fetch(`/api/fmp?endpoint=batch-quote&symbols=${target}`),
+        fetch(`/api/fmp?endpoint=profile&symbol=${target}`),
+      ]);
+      const quoteData = await quoteRes.json();
+      const profileData = await profileRes.json();
+      const q = Array.isArray(quoteData) ? quoteData[0] : null;
+      const p = Array.isArray(profileData) ? profileData[0] : null;
+
+      if (!q) { setLoading(false); return; }
+
+      // Use AI for analysis
+      const aiRes = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `Generate a trading signal for ${target}. Current price: $${q.price}. Change today: ${q.changePercentage?.toFixed(2)}%. 
+52W High: $${q.yearHigh}, 52W Low: $${q.yearLow}. 50-Day MA: $${q.priceAvg50}, 200-Day MA: $${q.priceAvg200}.
+Beta: ${p?.beta || 'N/A'}. PE: ${p?.pe || 'N/A'}. Last Dividend: $${p?.lastDividend || 0}.
+
+Respond in EXACTLY this JSON format (no markdown, no code blocks, just raw JSON):
+{"signal":"BUY","score":75,"reason":"Brief 1-sentence reason","indicators":[{"name":"50/200 MA","value":"Bullish Cross","signal":"bullish"},{"name":"RSI","value":"55","signal":"neutral"},{"name":"Volume","value":"Above Avg","signal":"bullish"},{"name":"Valuation","value":"Fair","signal":"neutral"}]}`,
+          history: [],
+        }),
+      });
+      const aiData = await aiRes.json();
+
+      let parsed: any = { signal: "HOLD", score: 50, reason: "Analysis pending", indicators: [] };
+      try {
+        // Try to parse AI response as JSON
+        const cleaned = aiData.response.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // Fallback: generate from data
+        const above50 = q.price > q.priceAvg50;
+        const above200 = q.price > q.priceAvg200;
+        const nearHigh = q.yearHigh > 0 ? ((q.yearHigh - q.price) / q.yearHigh * 100) < 10 : false;
+        const score = (above50 ? 20 : 0) + (above200 ? 20 : 0) + (q.changePercentage > 0 ? 15 : 0) + (nearHigh ? 10 : 0) + 25;
+        parsed = {
+          signal: score >= 70 ? "BUY" : score <= 40 ? "SELL" : "HOLD",
+          score,
+          reason: above50 && above200 ? "Trading above key moving averages" : "Mixed signals from technical indicators",
+          indicators: [
+            { name: "50-Day MA", value: above50 ? "Above" : "Below", signal: above50 ? "bullish" : "bearish" },
+            { name: "200-Day MA", value: above200 ? "Above" : "Below", signal: above200 ? "bullish" : "bearish" },
+            { name: "52W Position", value: `${((q.price - q.yearLow) / (q.yearHigh - q.yearLow) * 100).toFixed(0)}%`, signal: nearHigh ? "bullish" : "neutral" },
+            { name: "Trend", value: q.changePercentage > 0 ? "Up" : "Down", signal: q.changePercentage > 0 ? "bullish" : "bearish" },
+          ],
+        };
+      }
+
+      const newSignal: Signal = {
+        symbol: q.symbol, name: q.name || target,
+        price: q.price, change: q.change, changePct: q.changePercentage,
+        signal: parsed.signal, score: parsed.score,
+        reason: parsed.reason,
+        indicators: parsed.indicators || [],
+      };
+
+      setSignals(prev => {
+        const filtered = prev.filter(s => s.symbol !== target);
+        return [newSignal, ...filtered];
+      });
+    } catch { /* */ }
+    setLoading(false);
+    setSymbol("");
+  };
+
+  const getSignalColor = (signal: string) => {
+    if (signal === "BUY") return "var(--accent)";
+    if (signal === "SELL") return "var(--red)";
+    return "var(--yellow)";
+  };
+
+  const getSignalIcon = (signal: string) => {
+    if (signal === "BUY") return <TrendingUp size={18} />;
+    if (signal === "SELL") return <TrendingDown size={18} />;
+    return <Minus size={18} />;
+  };
+
   return (
     <div style={{ padding: "28px 32px" }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Market Signals</h1>
-        <p style={{ color: "var(--text-muted)", fontSize: 14 }}>AI-analyzed market signals and news sentiment</p>
+        <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>AI Trading Signals</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: 14 }}>AI-powered buy/sell/hold signals based on real-time technical analysis</p>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-        {/* Signals */}
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>AI Trading Signals</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {SIGNALS.map((s, i) => (
-              <div key={i} className="card" style={{ padding: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 36, height: 36, borderRadius: 8,
-                      background: s.type === "bullish" ? "var(--accent-light)" : s.type === "bearish" ? "var(--red-light)" : "var(--yellow-light)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: s.type === "bullish" ? "var(--accent)" : s.type === "bearish" ? "var(--red)" : "var(--yellow)",
-                    }}>
-                      {s.type === "bullish" ? <TrendingUp size={18} /> : s.type === "bearish" ? <TrendingDown size={18} /> : <BarChart3 size={18} />}
-                    </div>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: 15 }}>{s.symbol}</span>
-                        <span className={`badge ${s.type === "bullish" ? "badge-green" : s.type === "bearish" ? "badge-red" : "badge-yellow"}`}>
-                          {s.type.charAt(0).toUpperCase() + s.type.slice(1)}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{s.title}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--text-muted)", fontSize: 12 }}>
-                    <Clock size={12} /> {s.time}
-                  </div>
-                </div>
-                <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, marginBottom: 12 }}>{s.desc}</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>AI Confidence:</span>
-                  <div style={{ width: 80, height: 6, background: "var(--bg-secondary)", borderRadius: 3 }}>
-                    <div style={{
-                      height: "100%", width: `${s.confidence}%`, borderRadius: 3,
-                      background: s.confidence >= 75 ? "var(--accent)" : s.confidence >= 60 ? "var(--yellow)" : "var(--red)",
-                    }} />
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600 }}>{s.confidence}%</span>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Search */}
+      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <Zap size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+          <input className="input" placeholder="Enter stock symbol (e.g. AAPL)"
+            value={symbol} onChange={e => setSymbol(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && analyzeStock()}
+            style={{ flex: 1, fontSize: 14 }} />
+          <button className="btn btn-primary btn-sm" onClick={() => analyzeStock()} disabled={loading || !symbol.trim()}>
+            {loading ? <RefreshCw size={14} className="spin" /> : <BarChart3 size={14} />} Analyze
+          </button>
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Quick:</span>
+          {POPULAR.map(s => (
+            <button key={s} className="btn btn-ghost" style={{ fontSize: 11, padding: "2px 8px" }}
+              onClick={() => analyzeStock(s)} disabled={loading}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* News */}
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Market News</h3>
-          <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            {NEWS.map((n, i) => (
-              <div key={i} style={{
-                padding: "16px 20px",
-                borderBottom: i < NEWS.length - 1 ? "1px solid var(--border)" : "none",
-                cursor: "pointer", transition: "background 0.2s",
-              }}
-                onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-card-hover)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+      {/* Loading */}
+      {loading && (
+        <div className="card" style={{ padding: 32, textAlign: "center", marginBottom: 20 }}>
+          <RefreshCw size={24} className="spin" style={{ color: "var(--accent)", margin: "0 auto 12px" }} />
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>Analyzing with AI + real-time data...</p>
+        </div>
+      )}
+
+      {/* Signals */}
+      {signals.length === 0 && !loading ? (
+        <div className="card" style={{ padding: 48, textAlign: "center" }}>
+          <BarChart3 size={48} style={{ color: "var(--text-muted)", margin: "0 auto 16px" }} />
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No signals yet</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+            Enter a stock symbol above to get AI-powered trading signals.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 16 }}>
+          {signals.map(s => (
+            <div key={s.symbol} className="card" style={{ padding: 24 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
                   <div style={{
-                    width: 8, height: 8, borderRadius: "50%", marginTop: 6, flexShrink: 0,
-                    background: n.sentiment === "bullish" ? "var(--accent)" : "var(--red)",
-                  }} />
+                    width: 48, height: 48, borderRadius: 12,
+                    background: `${getSignalColor(s.signal)}20`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: getSignalColor(s.signal),
+                    border: `2px solid ${getSignalColor(s.signal)}`,
+                  }}>
+                    {getSignalIcon(s.signal)}
+                  </div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.5, marginBottom: 6 }}>{n.title}</div>
-                    <div style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--text-muted)" }}>
-                      <span>{n.source}</span>
-                      <span>•</span>
-                      <span>{n.time}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 20, fontWeight: 800 }}>{s.symbol}</span>
+                      <span className={`badge ${s.signal === "BUY" ? "badge-green" : s.signal === "SELL" ? "badge-red" : "badge-yellow"}`}
+                        style={{ fontSize: 13, fontWeight: 700 }}>
+                        {s.signal}
+                      </span>
                     </div>
+                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{s.name}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700 }}>${s.price.toFixed(2)}</div>
+                  <div style={{ fontSize: 13, color: s.changePct >= 0 ? "var(--accent)" : "var(--red)" }}>
+                    {s.changePct >= 0 ? "+" : ""}{s.changePct.toFixed(2)}%
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* AI Score */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                  <span style={{ color: "var(--text-muted)" }}>AI Score</span>
+                  <span style={{ fontWeight: 700, color: getSignalColor(s.signal) }}>{s.score}/100</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 4, background: "var(--bg-secondary)" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 4,
+                    width: `${s.score}%`,
+                    background: `linear-gradient(90deg, ${getSignalColor(s.signal)}80, ${getSignalColor(s.signal)})`,
+                    transition: "width 0.5s",
+                  }} />
+                </div>
+              </div>
+
+              {/* Reason */}
+              <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 16, lineHeight: 1.6 }}>
+                💡 {s.reason}
+              </p>
+
+              {/* Indicators */}
+              {s.indicators.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                  {s.indicators.map((ind, i) => (
+                    <div key={i} style={{
+                      padding: "10px 12px", borderRadius: 10,
+                      background: ind.signal === "bullish" ? "rgba(16,185,129,0.08)" : ind.signal === "bearish" ? "rgba(239,68,68,0.08)" : "var(--bg-secondary)",
+                      border: `1px solid ${ind.signal === "bullish" ? "rgba(16,185,129,0.2)" : ind.signal === "bearish" ? "rgba(239,68,68,0.2)" : "var(--border)"}`,
+                    }}>
+                      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{ind.name}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: ind.signal === "bullish" ? "var(--accent)" : ind.signal === "bearish" ? "var(--red)" : "var(--text-secondary)" }}>
+                        {ind.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 20, textAlign: "center" }}>
+        ⚠️ AI signals are for informational purposes only. Not financial advice. Always do your own research.
+      </p>
     </div>
   );
 }
