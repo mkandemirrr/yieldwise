@@ -1,29 +1,31 @@
 "use client";
-import { useState } from "react";
-import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, ArrowUpRight, ArrowDownRight, Plus, Search, Star, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, ArrowUpRight, ArrowDownRight, Plus, Search, Star, Zap, RefreshCw } from "lucide-react";
 
-const PORTFOLIO_STATS = [
-  { label: "Portfolio Value", value: "$127,450.30", change: "+$3,012.50", pct: "+2.42%", up: true, icon: <BarChart3 size={20} /> },
-  { label: "Daily P&L", value: "+$3,012.50", change: "Today", pct: "+2.42%", up: true, icon: <TrendingUp size={20} /> },
-  { label: "Dividend Income", value: "$4,820/yr", change: "$401.67/mo", pct: "3.78% yield", up: true, icon: <DollarSign size={20} /> },
-  { label: "AI Health Score", value: "87/100", change: "Strong", pct: "Well Diversified", up: true, icon: <Zap size={20} /> },
-];
+interface Quote {
+  symbol: string;
+  name: string;
+  price: number;
+  changePercentage: number;
+  change: number;
+  volume: number;
+  dayLow: number;
+  dayHigh: number;
+  yearHigh: number;
+  yearLow: number;
+  marketCap: number;
+  open: number;
+  previousClose: number;
+}
 
-const WATCHLIST = [
-  { symbol: "AAPL", name: "Apple Inc.", price: 218.45, change: 2.01, pct: 0.93, up: true },
-  { symbol: "MSFT", name: "Microsoft Corp.", price: 452.30, change: -1.55, pct: -0.34, up: false },
-  { symbol: "GOOGL", name: "Alphabet Inc.", price: 178.90, change: 3.76, pct: 2.15, up: true },
-  { symbol: "NVDA", name: "NVIDIA Corp.", price: 892.40, change: 27.73, pct: 3.21, up: true },
-  { symbol: "AMZN", name: "Amazon.com Inc.", price: 198.75, change: 2.84, pct: 1.45, up: true },
-  { symbol: "TSLA", name: "Tesla Inc.", price: 245.60, change: -3.06, pct: -1.23, up: false },
-];
-
-const MARKET_INDEX = [
-  { name: "S&P 500", value: "5,892.34", change: "+1.24%", up: true },
-  { name: "NASDAQ", value: "19,234.67", change: "+1.87%", up: true },
-  { name: "DOW", value: "43,456.78", change: "+0.67%", up: true },
-  { name: "BTC/USD", value: "$94,250", change: "+2.80%", up: true },
-];
+const WATCHLIST_SYMBOLS = ["AAPL", "MSFT", "GOOGL", "NVDA", "AMZN", "TSLA"];
+const MARKET_SYMBOLS = ["SPY", "QQQ", "DIA", "IWM"];
+const MARKET_NAMES: Record<string, string> = {
+  SPY: "S&P 500",
+  QQQ: "NASDAQ 100",
+  DIA: "Dow Jones",
+  IWM: "Russell 2000",
+};
 
 const AI_INSIGHTS = [
   { type: "alert", title: "AAPL earnings report in 3 days", desc: "Historical volatility increases 15% around earnings. Consider adjusting position size.", color: "var(--yellow)" },
@@ -40,8 +42,56 @@ const SECTOR_DATA = [
   { name: "Other", pct: 10, color: "var(--text-muted)" },
 ];
 
+function formatMarketCap(n: number) {
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  return `$${n.toLocaleString()}`;
+}
+
 export default function DashboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [watchlist, setWatchlist] = useState<Quote[]>([]);
+  const [market, setMarket] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [watchRes, marketRes] = await Promise.all([
+        fetch(`/api/fmp?endpoint=batch-quote&symbols=${WATCHLIST_SYMBOLS.join(",")}`),
+        fetch(`/api/fmp?endpoint=batch-quote&symbols=${MARKET_SYMBOLS.join(",")}`),
+      ]);
+      const watchData = await watchRes.json();
+      const marketData = await marketRes.json();
+
+      if (Array.isArray(watchData)) setWatchlist(watchData);
+      if (Array.isArray(marketData)) setMarket(marketData);
+      setLastUpdated(new Date());
+    } catch (e) {
+      console.error("Failed to fetch data", e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  // Calculate portfolio stats from watchlist (demo: equal shares)
+  const totalValue = watchlist.reduce((sum, s) => sum + s.price * 10, 0);
+  const totalChange = watchlist.reduce((sum, s) => sum + s.change * 10, 0);
+  const totalChangePct = totalValue > 0 ? (totalChange / (totalValue - totalChange)) * 100 : 0;
+
+  const PORTFOLIO_STATS = [
+    { label: "Portfolio Value", value: `$${totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: `${totalChange >= 0 ? "+" : ""}$${totalChange.toFixed(2)}`, pct: `${totalChange >= 0 ? "+" : ""}${totalChangePct.toFixed(2)}%`, up: totalChange >= 0, icon: <BarChart3 size={20} /> },
+    { label: "Daily P&L", value: `${totalChange >= 0 ? "+" : ""}$${totalChange.toFixed(2)}`, change: "Today", pct: `${totalChange >= 0 ? "+" : ""}${totalChangePct.toFixed(2)}%`, up: totalChange >= 0, icon: <TrendingUp size={20} /> },
+    { label: "Dividend Income", value: "$4,820/yr", change: "$401.67/mo", pct: "3.78% yield", up: true, icon: <DollarSign size={20} /> },
+    { label: "AI Health Score", value: "87/100", change: "Strong", pct: "Well Diversified", up: true, icon: <Zap size={20} /> },
+  ];
+
+  const filteredWatchlist = searchTerm
+    ? watchlist.filter(s => s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) || s.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : watchlist;
 
   return (
     <div style={{ padding: "28px 32px" }}>
@@ -49,8 +99,13 @@ export default function DashboardPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Dashboard</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: 14 }}>
+          <p style={{ color: "var(--text-muted)", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
             Welcome back! Here&apos;s your financial overview.
+            {lastUpdated && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -60,6 +115,9 @@ export default function DashboardPage() {
               onChange={e => setSearchTerm(e.target.value)}
               style={{ width: 240, paddingLeft: 38, fontSize: 13 }} />
           </div>
+          <button className="btn btn-ghost btn-sm" onClick={fetchData} title="Refresh">
+            <RefreshCw size={16} className={loading ? "spin" : ""} />
+          </button>
           <button className="btn btn-primary btn-sm">
             <Plus size={16} /> Add Stock
           </button>
@@ -81,7 +139,7 @@ export default function DashboardPage() {
                 {s.icon}
               </div>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>{s.value}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>{loading ? "—" : s.value}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{
                 fontSize: 12, fontWeight: 600,
@@ -105,49 +163,62 @@ export default function DashboardPage() {
             padding: "16px 20px", borderBottom: "1px solid var(--border)",
             display: "flex", justifyContent: "space-between", alignItems: "center",
           }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700 }}>Watchlist</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              Watchlist
+              <span className="badge badge-green" style={{ fontSize: 11 }}>LIVE</span>
+            </h3>
             <button className="btn btn-ghost btn-sm" style={{ fontSize: 12 }}>
               <Plus size={14} /> Add
             </button>
           </div>
           <div>
-            {WATCHLIST.map((stock, i) => (
-              <div key={stock.symbol} style={{
-                padding: "14px 20px",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                borderBottom: i < WATCHLIST.length - 1 ? "1px solid var(--border)" : "none",
-                cursor: "pointer", transition: "background 0.2s",
-              }}
-                onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-card-hover)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    background: "var(--bg-secondary)", display: "flex",
-                    alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 700, color: "var(--accent)",
-                  }}>
-                    {stock.symbol.slice(0, 2)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>{stock.symbol}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{stock.name}</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>${stock.price.toFixed(2)}</div>
-                  <div style={{
-                    fontSize: 12, fontWeight: 500,
-                    color: stock.up ? "var(--accent)" : "var(--red)",
-                    display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2,
-                  }}>
-                    {stock.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                    {stock.up ? "+" : ""}{stock.change.toFixed(2)} ({stock.pct > 0 ? "+" : ""}{stock.pct.toFixed(2)}%)
-                  </div>
-                </div>
+            {loading ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
+                Loading live data...
               </div>
-            ))}
+            ) : filteredWatchlist.length === 0 ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--text-muted)" }}>
+                No stocks found
+              </div>
+            ) : (
+              filteredWatchlist.map((stock, i) => (
+                <div key={stock.symbol} style={{
+                  padding: "14px 20px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  borderBottom: i < filteredWatchlist.length - 1 ? "1px solid var(--border)" : "none",
+                  cursor: "pointer", transition: "background 0.2s",
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-card-hover)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 8,
+                      background: "var(--bg-secondary)", display: "flex",
+                      alignItems: "center", justifyContent: "center",
+                      fontSize: 12, fontWeight: 700, color: "var(--accent)",
+                    }}>
+                      {stock.symbol.slice(0, 2)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{stock.symbol}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{stock.name}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>${stock.price.toFixed(2)}</div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 500,
+                      color: stock.change >= 0 ? "var(--accent)" : "var(--red)",
+                      display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 2,
+                    }}>
+                      {stock.change >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                      {stock.change >= 0 ? "+" : ""}{stock.change.toFixed(2)} ({stock.changePercentage >= 0 ? "+" : ""}{stock.changePercentage.toFixed(2)}%)
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -155,23 +226,32 @@ export default function DashboardPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Market Overview */}
           <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
               <h3 style={{ fontSize: 16, fontWeight: 700 }}>Market Overview</h3>
+              <span className="badge badge-green" style={{ fontSize: 11 }}>LIVE</span>
             </div>
-            {MARKET_INDEX.map((m, i) => (
-              <div key={m.name} style={{
-                padding: "12px 20px", display: "flex", justifyContent: "space-between",
-                borderBottom: i < MARKET_INDEX.length - 1 ? "1px solid var(--border)" : "none",
-              }}>
-                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{m.name}</span>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{m.value}</span>
-                  <span style={{ fontSize: 12, color: m.up ? "var(--accent)" : "var(--red)", fontWeight: 500 }}>
-                    {m.change}
-                  </span>
+            {loading ? (
+              <div style={{ padding: 30, textAlign: "center", color: "var(--text-muted)" }}>Loading...</div>
+            ) : (
+              market.map((m, i) => (
+                <div key={m.symbol} style={{
+                  padding: "12px 20px", display: "flex", justifyContent: "space-between",
+                  borderBottom: i < market.length - 1 ? "1px solid var(--border)" : "none",
+                }}>
+                  <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{MARKET_NAMES[m.symbol] || m.symbol}</span>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>${m.price.toFixed(2)}</span>
+                    <span style={{
+                      fontSize: 12,
+                      color: m.changePercentage >= 0 ? "var(--accent)" : "var(--red)",
+                      fontWeight: 500,
+                    }}>
+                      {m.changePercentage >= 0 ? "+" : ""}{m.changePercentage.toFixed(2)}%
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Sector Allocation */}
