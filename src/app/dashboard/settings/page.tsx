@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { User, CreditCard, Bell, Trash2, Check, Database, LogOut, Shield, Crown, Zap, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSubscription, setSubscription, type PlanTier } from "@/lib/lemonsqueezy";
 
-export default function SettingsPage() {
+function SettingsContent() {
   const [saved, setSaved] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -355,5 +355,13 @@ export default function SettingsPage() {
         <LogOut size={16} /> Sign Out
       </button>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32 }}>Loading settings...</div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }
