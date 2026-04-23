@@ -33,6 +33,13 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" />
         <meta name="theme-color" content="#0a0e17" />
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-PRWRZ2HBJM"></script>
+        <script dangerouslySetInnerHTML={{ __html: `
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-PRWRZ2HBJM');
+        `}} />
       </head>
       <body>
         {children}
