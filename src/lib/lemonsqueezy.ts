@@ -1,5 +1,5 @@
 /**
- * Lemon Squeezy subscription helper
+ * Paddle subscription helper
  * Stores plan info in localStorage (client) and verifies via API (server)
  */
 
@@ -7,7 +7,7 @@ export type PlanTier = "free" | "pro" | "premium";
 
 export interface Subscription {
   plan: PlanTier;
-  variantId: number | null;
+  priceId: string | null;
   customerId: string | null;
   subscriptionId: string | null;
   expiresAt: string | null;
@@ -46,16 +46,16 @@ export const PLAN_LIMITS = {
 
 export function getSubscription(): Subscription {
   if (typeof window === "undefined") {
-    return { plan: "free", variantId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
+    return { plan: "free", priceId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
   }
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
-    return { plan: "free", variantId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
+    return { plan: "free", priceId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
   }
   try {
     return JSON.parse(stored);
   } catch {
-    return { plan: "free", variantId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
+    return { plan: "free", priceId: null, customerId: null, subscriptionId: null, expiresAt: null, status: "free" };
   }
 }
 
@@ -71,11 +71,11 @@ export function clearSubscription() {
   }
 }
 
-export function getPlanFromVariantId(variantId: number): PlanTier {
-  const proId = parseInt(process.env.NEXT_PUBLIC_LEMON_SQUEEZY_PRO_VARIANT_ID || "0");
-  const premiumId = parseInt(process.env.NEXT_PUBLIC_LEMON_SQUEEZY_PREMIUM_VARIANT_ID || "0");
-  if (variantId === premiumId) return "premium";
-  if (variantId === proId) return "pro";
+export function getPlanFromPriceId(priceId: string): PlanTier {
+  const proId = process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID || "";
+  const premiumId = process.env.NEXT_PUBLIC_PADDLE_PREMIUM_PRICE_ID || "";
+  if (priceId === premiumId) return "premium";
+  if (priceId === proId) return "pro";
   return "free";
 }
 

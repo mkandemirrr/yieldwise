@@ -68,28 +68,31 @@ function SettingsContent() {
     router.push("/login");
   };
 
-  const handleUpgrade = async (variantId: string, planName: string) => {
+  const handleUpgrade = async (priceId: string, planName: string) => {
     setUpgrading(planName);
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variantId: parseInt(variantId) }),
-      });
-      const data = await res.json();
-      if (data.url) {
+      // Paddle.js overlay checkout
+      const Paddle = (window as any).Paddle;
+      if (Paddle) {
+        Paddle.Checkout.open({
+          items: [{ priceId, quantity: 1 }],
+          customer: { email },
+          customData: { user_id: email },
+          settings: {
+            successUrl: "https://yieldwise.ai/dashboard/settings?upgraded=true",
+          },
+        });
         // Save plan optimistically
         setSubscription({
           plan: planName as PlanTier,
-          variantId: parseInt(variantId),
+          priceId,
           customerId: null,
           subscriptionId: null,
           expiresAt: null,
           status: "pending",
         });
-        window.location.href = data.url;
       } else {
-        alert("Failed to create checkout. Please try again.");
+        alert("Payment system loading. Please try again in a moment.");
       }
     } catch {
       alert("An error occurred. Please try again.");
@@ -107,8 +110,8 @@ function SettingsContent() {
     try { return JSON.parse(localStorage.getItem("yw_dividends") || "[]").length; } catch { return 0; }
   })();
 
-  const proVariantId = process.env.NEXT_PUBLIC_LEMON_SQUEEZY_PRO_VARIANT_ID || "";
-  const premiumVariantId = process.env.NEXT_PUBLIC_LEMON_SQUEEZY_PREMIUM_VARIANT_ID || "";
+  const proPriceId = process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID || "";
+  const premiumPriceId = process.env.NEXT_PUBLIC_PADDLE_PREMIUM_PRICE_ID || "";
 
   return (
     <div style={{ padding: "28px 32px", maxWidth: 700 }}>
@@ -216,7 +219,7 @@ function SettingsContent() {
                 <li>✅ Email alerts</li>
               </ul>
               <button className="btn btn-primary" style={{ width: "100%", fontSize: 13 }}
-                onClick={() => handleUpgrade(proVariantId, "pro")}
+                onClick={() => handleUpgrade(proPriceId, "pro")}
                 disabled={!!upgrading}>
                 {upgrading === "pro" ? "Redirecting..." : "Upgrade to Pro →"}
               </button>
@@ -246,7 +249,7 @@ function SettingsContent() {
                 background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "white",
                 border: "none", padding: "10px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
               }}
-                onClick={() => handleUpgrade(premiumVariantId, "premium")}
+                onClick={() => handleUpgrade(premiumPriceId, "premium")}
                 disabled={!!upgrading}>
                 {upgrading === "premium" ? "Redirecting..." : "Go Premium →"}
               </button>
@@ -276,7 +279,7 @@ function SettingsContent() {
                   background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "white",
                   border: "none", padding: "8px 16px", borderRadius: 8, fontWeight: 600, cursor: "pointer",
                 }}
-                  onClick={() => handleUpgrade(premiumVariantId, "premium")}
+                  onClick={() => handleUpgrade(premiumPriceId, "premium")}
                   disabled={!!upgrading}>
                   {upgrading === "premium" ? "Redirecting..." : "Upgrade →"}
                 </button>

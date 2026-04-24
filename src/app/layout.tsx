@@ -40,6 +40,12 @@ export default function RootLayout({
           gtag('js', new Date());
           gtag('config', 'G-PRWRZ2HBJM');
         `}} />
+        <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+        <script dangerouslySetInnerHTML={{ __html: `
+          if (typeof Paddle !== 'undefined') {
+            Paddle.Initialize({ token: 'live_3cc6f5f672faaa7d53220bad010' });
+          }
+        `}} />
       </head>
       <body>
         {children}

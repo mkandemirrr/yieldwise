@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * POST /api/checkout — creates a Lemon Squeezy checkout URL
+ * POST /api/checkout — returns Paddle price ID for client-side checkout
+ * Paddle uses client-side Paddle.js for overlay checkout, so we just validate the user
+ * and return the necessary data for the frontend to open the checkout.
  */
 export async function POST(request: Request) {
   try {
-    const { variantId } = await request.json();
-    if (!variantId) {
-      return NextResponse.json({ error: "Missing variantId" }, { status: 400 });
+    const { priceId } = await request.json();
+    if (!priceId) {
+      return NextResponse.json({ error: "Missing priceId" }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -17,49 +19,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
-    const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
-
-    if (!apiKey || !storeId) {
-      return NextResponse.json({ error: "Payment not configured" }, { status: 500 });
-    }
-
-    const res = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/vnd.api+json",
-        Accept: "application/vnd.api+json",
-      },
-      body: JSON.stringify({
-        data: {
-          type: "checkouts",
-          attributes: {
-            checkout_data: {
-              email: user.email,
-              custom: { user_id: user.id },
-            },
-            product_options: {
-              redirect_url: "https://yieldwise.ai/dashboard/settings?upgraded=true",
-            },
-          },
-          relationships: {
-            store: { data: { type: "stores", id: storeId } },
-            variant: { data: { type: "variants", id: String(variantId) } },
-          },
-        },
-      }),
+    // Paddle checkout is handled client-side via Paddle.js
+    // We return user info so the frontend can pre-fill the checkout
+    return NextResponse.json({
+      priceId,
+      customerEmail: user.email,
+      customData: { user_id: user.id },
+      successUrl: "https://yieldwise.ai/dashboard/settings?upgraded=true",
     });
-
-    const data = await res.json();
-    const checkoutUrl = data?.data?.attributes?.url;
-
-    if (!checkoutUrl) {
-      console.error("Checkout error:", JSON.stringify(data));
-      return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
-    }
-
-    return NextResponse.json({ url: checkoutUrl });
   } catch (error) {
     console.error("Checkout error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
