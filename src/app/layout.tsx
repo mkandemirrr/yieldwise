@@ -2,20 +2,20 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "YieldWise AI — AI-Powered Financial Assistant",
-  description: "Your intelligent financial assistant. AI portfolio analysis, dividend tracking, stock screening, and market signals — all powered by artificial intelligence.",
-  keywords: ["AI financial assistant", "portfolio analysis", "dividend tracker", "stock screener", "AI investing", "market signals", "yield analysis"],
+  title: "YieldWise AI — AI-Powered Financial Research & Education",
+  description: "AI-powered research and education platform. Portfolio tracking, dividend analysis, stock screening, and market data — all powered by artificial intelligence.",
+  keywords: ["AI financial research", "portfolio tracking", "dividend tracker", "stock screener", "market education", "market signals", "yield analysis"],
   openGraph: {
-    title: "YieldWise AI — AI-Powered Financial Assistant",
-    description: "Your intelligent financial assistant. AI portfolio analysis, dividend tracking, stock screening, and market signals.",
+    title: "YieldWise AI — AI-Powered Financial Research & Education",
+    description: "AI-powered research and education platform. Portfolio tracking, dividend analysis, stock screening, and market data.",
     url: "https://yieldwise.ai",
     siteName: "YieldWise AI",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "YieldWise AI — AI-Powered Financial Assistant",
-    description: "Your intelligent financial assistant. AI portfolio analysis, dividend tracking, and market signals.",
+    title: "YieldWise AI — AI-Powered Financial Research & Education",
+    description: "AI-powered research and education platform. Portfolio tracking, dividend analysis, and market data.",
   },
   robots: {
     index: true,

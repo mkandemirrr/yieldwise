@@ -26,7 +26,7 @@ const FEATURES = [
   {
     icon: <PieChart size={28} />,
     title: "AI Portfolio Analyzer",
-    desc: "Get instant AI-powered analysis of your portfolio. Sector allocation, risk scoring, diversification insights, and personalized recommendations.",
+    desc: "Get instant AI-powered analysis of your portfolio. Sector allocation, risk scoring, diversification insights, and educational breakdowns.",
     color: "var(--accent)",
     bg: "var(--accent-light)",
   },
@@ -340,7 +340,7 @@ export default function LandingPage() {
             {[
               { step: "01", title: "Create Your Account", desc: "Sign up for free in seconds. No credit card needed." },
               { step: "02", title: "Add Your Stocks", desc: "Add your holdings or let AI analyze any stock instantly." },
-              { step: "03", title: "Get AI Insights", desc: "Receive personalized analysis, signals, and recommendations." },
+              { step: "03", title: "Get AI Insights", desc: "Explore data-driven analysis, market signals, and educational insights." },
             ].map(s => (
               <div key={s.step} style={{ textAlign: "center" }}>
                 <div style={{
@@ -462,7 +462,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <p style={{ fontSize: 14, color: "var(--text-muted)", maxWidth: 280, lineHeight: 1.7 }}>
-                AI-powered financial assistant helping investors make smarter decisions with real-time data and intelligent analysis.
+                AI-powered research and education platform helping investors explore markets with real-time data and intelligent analysis.
               </p>
             </div>
             <div>

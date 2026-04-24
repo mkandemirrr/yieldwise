@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1500,
-        system: "You are a professional portfolio analyst. Analyze the given portfolio and provide: 1) Overall health score (0-100), 2) Sector diversification analysis, 3) Risk assessment, 4) Top 3 recommendations for improvement. Be concise and use bullet points. Add disclaimer about not being financial advice.",
+        system: "You are a portfolio data analyst. Analyze the given portfolio and provide: 1) Overall health score (0-100), 2) Sector diversification analysis, 3) Risk assessment, 4) Top 3 observations for educational purposes. Be concise and use bullet points. Add disclaimer that this is for educational purposes only, not financial advice.",
         messages: [{ role: "user", content: `Analyze this portfolio:\n${JSON.stringify(portfolio, null, 2)}` }],
       }),
     });
@@ -42,9 +42,9 @@ function generateBasicAnalysis(portfolio: any[]): string {
     `💰 Total Value: $${totalValue.toLocaleString()}\n` +
     `📈 Total Return: ${Number(pl) >= 0 ? "+" : ""}${pl}%\n\n` +
     `📌 Sector Breakdown:\n${Object.entries(sectors).map(([k, v]) => `  • ${k}: ${v} stocks`).join("\n")}\n\n` +
-    `⚠️ Recommendations:\n` +
+    `⚠️ Key Observations:\n` +
     `  1. ${Object.keys(sectors).length < 4 ? "Consider adding more sectors for diversification" : "Good sector diversification"}\n` +
     `  2. ${portfolio.length < 10 ? "Consider adding more holdings (target 10-15)" : "Good number of holdings"}\n` +
     `  3. Review positions with >15% of total portfolio value\n\n` +
-    `⚖️ This is not financial advice. Always do your own research.`;
+    `⚖️ For educational purposes only. Not financial advice. Always do your own research.`;
 }

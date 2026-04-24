@@ -46,7 +46,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "👋 **Welcome to YieldWise AI!**\n\nI'm your personal financial assistant powered by real-time market data + AI.\n\n**What I can do:**\n- 📈 Analyze any stock with live prices\n- 💰 Find the best dividend opportunities\n- 🎯 Evaluate your portfolio risk\n- 📊 Compare stocks side-by-side\n- 🌎 Provide market outlook and trends\n\nTry one of the suggestions below or ask me anything!",
+      content: "👋 **Welcome to YieldWise AI!**\n\nI'm your financial research and education tool powered by real-time market data + AI.\n\n**What I can do:**\n- 📈 Look up any stock with live prices\n- 💰 Explore dividend data and income tracking\n- 🎯 Analyze your portfolio diversification\n- 📊 Compare stocks side-by-side\n- 🌎 Explore market trends and data\n\nTry one of the suggestions below or ask me anything!",
       timestamp: new Date(),
     },
   ]);
